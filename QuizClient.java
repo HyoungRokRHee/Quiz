@@ -9,27 +9,20 @@ public class QuizClient {
     public static void main(String[] args) {
         loadServerConfig();
 
-        try (Socket socket = new Socket(SERVER_IP, SERVER_PORT);
-             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader console = new BufferedReader(new InputStreamReader(System.in))
-        ) {
+        try (Socket socket = new Socket(SERVER_IP, SERVER_PORT)) {
             System.out.println("Connected to Quiz Server at " + SERVER_IP + ":" + SERVER_PORT);
 
-            String serverResponse;
-            while ((serverResponse = in.readLine()) != null) {
-                if (serverResponse.startsWith("QUESTION:")) {
-                    System.out.println(serverResponse);
-                    System.out.print("Your answer: ");
-                    String answer = console.readLine();
-                    out.println(answer);
-                } else {
-                    System.out.println(serverResponse);
-                }
-            }
+            Thread listenerThread = new Thread(new ClientListener(socket));
+            Thread senderThread = new Thread(new ClientSender(socket));
 
-        } catch (IOException e) {
-            System.err.println("Error connecting to server: " + e.getMessage());
+            listenerThread.start();
+            senderThread.start();
+
+            listenerThread.join();
+            senderThread.join();
+
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error: " + e.getMessage());
         }
     }
 
@@ -42,6 +35,53 @@ public class QuizClient {
         } catch (IOException ex) {
             SERVER_IP = "localhost";
             SERVER_PORT = 1234;
+        }
+    }
+
+    private static class ClientListener implements Runnable {
+        private final Socket socket;
+
+        public ClientListener(Socket socket) {
+            this.socket = socket;
+        }
+
+        @Override
+        public void run() {
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                String response;
+                while ((response = in.readLine()) != null) {
+                    System.out.println(response);
+                    if (response.contains("final score")) {
+                        break;
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Listener error: " + e.getMessage());
+            }
+        }
+    }
+
+    private static class ClientSender implements Runnable {
+        private final Socket socket;
+
+        public ClientSender(Socket socket) {
+            this.socket = socket;
+        }
+
+        @Override
+        public void run() {
+            try (PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                 BufferedReader console = new BufferedReader(new InputStreamReader(System.in))) {
+                String userInput;
+                while ((userInput = console.readLine()) != null) {
+                    out.println(userInput);
+                    if (userInput.equalsIgnoreCase("exit")) {
+                        break;
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Sender error: " + e.getMessage());
+            }
         }
     }
 }
