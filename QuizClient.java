@@ -12,17 +12,21 @@ public class QuizClient {
         try (Socket socket = new Socket(SERVER_IP, SERVER_PORT)) {
             System.out.println("Connected to Quiz Server at " + SERVER_IP + ":" + SERVER_PORT);
 
+            // Thread to listen for server messages
             Thread listenerThread = new Thread(new ClientListener(socket));
+            // Thread to send user responses
             Thread senderThread = new Thread(new ClientSender(socket));
 
             listenerThread.start();
             senderThread.start();
 
-            listenerThread.join();
+            listenerThread.join(); // Ensures threads run concurrently
             senderThread.join();
 
-        } catch (IOException | InterruptedException e) {
-            System.err.println("Error: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("Error: Unable to connect to the server at " + SERVER_IP + ":" + SERVER_PORT);
+        } catch (InterruptedException e) {
+            System.err.println("Error: Thread interrupted - " + e.getMessage());
         }
     }
 
@@ -55,7 +59,7 @@ public class QuizClient {
                 String response;
                 while ((response = in.readLine()) != null) {
                     System.out.println(response);
-                    if (response.contains("final score")) {
+                    if (response.contains("final score")) { // Terminate on final score
                         break;
                     }
                 }
@@ -83,7 +87,7 @@ public class QuizClient {
                         continue;
                     }
                     out.println(userInput);
-                    if (userInput.equalsIgnoreCase("exit")) {
+                    if (userInput.equalsIgnoreCase("exit")) { // Exit condition
                         break;
                     }
                 }
